@@ -1,0 +1,27 @@
+{
+  "name": "pattern-maker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pattern Maker — Free Seamless Pattern Maker. No sign-up, download 2000px PNG tile or SVG.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "lucide-react": "^1.77.0",
+    "tailwindcss": "^4.3.5",
+    "@tailwindcss/postcss": "^4.3.5",
+    "postcss": "^8.5.33"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  }
+}
