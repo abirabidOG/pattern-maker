@@ -1,7 +1,8 @@
 import type { PatternState } from '../types';
 import { MOTIF_MAP } from '../motifs/data';
-import { renderMotifOnCanvas } from '../motifs/renderMotif';
+import { renderMotifOnCanvas, getCachedImage, renderImageMotifOnCanvas } from '../motifs/renderMotif';
 import { getWrappedMotifs, TILE_SIZE } from '../engine/seamlessWrap';
+
 
 export interface ExportPngOptions {
   size: 500 | 1000 | 2000 | 3000;
@@ -37,8 +38,27 @@ export async function exportTilePng(
   // Render all edge-wrapped motifs
   const wrapped = getWrappedMotifs(state.motifs);
   for (const item of wrapped) {
+    if (item.motif.imageDataUrl || state.uploadedImageUrl) {
+      const url = item.motif.imageDataUrl || state.uploadedImageUrl!;
+      const img = getCachedImage(url);
+      if (img && img.complete) {
+        renderImageMotifOnCanvas(
+          ctx,
+          img,
+          item.renderX,
+          item.renderY,
+          item.motif.scale,
+          item.motif.rotation,
+          item.motif.flipH,
+          item.motif.flipV
+        );
+      }
+      continue;
+    }
+
     const motifDef = MOTIF_MAP.get(item.motif.motifId);
     if (!motifDef) continue;
+
 
     const color =
       item.motif.customColor ||

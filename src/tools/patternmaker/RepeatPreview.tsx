@@ -4,8 +4,9 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Grid3X3, Grid2X2, Search, Layers } from 'lucide-react';
 import type { PatternState, RepeatGridSize } from './types';
 import { MOTIF_MAP } from './motifs/data';
-import { renderMotifOnCanvas } from './motifs/renderMotif';
+import { renderMotifOnCanvas, getCachedImage, renderImageMotifOnCanvas } from './motifs/renderMotif';
 import { getWrappedMotifs, TILE_SIZE } from './engine/seamlessWrap';
+
 
 interface RepeatPreviewProps {
   state: PatternState;
@@ -46,6 +47,24 @@ export const RepeatPreview: React.FC<RepeatPreviewProps> = ({ state }) => {
           ctx.translate(ox, oy);
 
           for (const item of wrapped) {
+            if (item.motif.imageDataUrl || state.uploadedImageUrl) {
+              const url = item.motif.imageDataUrl || state.uploadedImageUrl!;
+              const img = getCachedImage(url, () => drawRepeat());
+              if (img && img.complete) {
+                renderImageMotifOnCanvas(
+                  ctx,
+                  img,
+                  item.renderX,
+                  item.renderY,
+                  item.motif.scale,
+                  item.motif.rotation,
+                  item.motif.flipH,
+                  item.motif.flipV
+                );
+              }
+              continue;
+            }
+
             const motifDef = MOTIF_MAP.get(item.motif.motifId);
             if (!motifDef) continue;
             const color =
@@ -66,6 +85,7 @@ export const RepeatPreview: React.FC<RepeatPreviewProps> = ({ state }) => {
               item.motif.flipV
             );
           }
+
           ctx.restore();
         }
       }
@@ -107,6 +127,24 @@ export const RepeatPreview: React.FC<RepeatPreviewProps> = ({ state }) => {
         ctx.scale(scaleFactor, scaleFactor);
 
         for (const item of wrapped) {
+          if (item.motif.imageDataUrl || state.uploadedImageUrl) {
+            const url = item.motif.imageDataUrl || state.uploadedImageUrl!;
+            const img = getCachedImage(url, () => drawRepeat());
+            if (img && img.complete) {
+              renderImageMotifOnCanvas(
+                ctx,
+                img,
+                item.renderX,
+                item.renderY,
+                item.motif.scale,
+                item.motif.rotation,
+                item.motif.flipH,
+                item.motif.flipV
+              );
+            }
+            continue;
+          }
+
           const motifDef = MOTIF_MAP.get(item.motif.motifId);
           if (!motifDef) continue;
 
@@ -129,6 +167,7 @@ export const RepeatPreview: React.FC<RepeatPreviewProps> = ({ state }) => {
             item.motif.flipV
           );
         }
+
 
         ctx.restore();
       }

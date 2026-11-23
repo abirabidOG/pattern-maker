@@ -33,6 +33,7 @@ export interface PlacedMotif {
   colorIndex: number; // 0 to 3 from palette motif colors
   customColor?: string;
   isHandPlaced?: boolean;
+  imageDataUrl?: string; // Phase 2: custom uploaded image data URL
 }
 
 export interface Palette {
@@ -45,6 +46,7 @@ export interface Palette {
 export interface PatternState {
   version: 1;
   name?: string;
+  collection?: string; // Phase 2: named collection
   motifs: PlacedMotif[];
   style: StyleMode;
   layout: LayoutMode;
@@ -55,7 +57,9 @@ export interface PatternState {
   backgroundColor: string; // default #F3E5C3
   palette: Palette;
   activeMotifId: string;
+  uploadedImageUrl?: string; // Phase 2: active uploaded image
 }
+
 
 export interface PromptParseResult {
   matchedMotifs: string[];
@@ -67,7 +71,15 @@ export interface PromptParseResult {
 export interface SavedPatternItem {
   id: string;
   name: string;
+  collection?: string; // Phase 2: named collection
   timestamp: number;
   previewDataUrl: string;
   state: PatternState;
 }
+
+export interface PatternCollection {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+

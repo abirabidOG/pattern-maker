@@ -12,8 +12,9 @@ import {
 } from 'lucide-react';
 import type { PatternState, EditorTool, PlacedMotif } from './types';
 import { MOTIF_MAP } from './motifs/data';
-import { renderMotifOnCanvas } from './motifs/renderMotif';
+import { renderMotifOnCanvas, getCachedImage, renderImageMotifOnCanvas } from './motifs/renderMotif';
 import { getWrappedMotifs, TILE_SIZE } from './engine/seamlessWrap';
+
 
 interface TileCanvasProps {
   state: PatternState;
@@ -68,6 +69,24 @@ export const TileCanvas: React.FC<TileCanvasProps> = ({
     const wrapped = getWrappedMotifs(state.motifs);
 
     for (const item of wrapped) {
+      if (item.motif.imageDataUrl || state.uploadedImageUrl) {
+        const url = item.motif.imageDataUrl || state.uploadedImageUrl!;
+        const img = getCachedImage(url, () => redraw());
+        if (img && img.complete) {
+          renderImageMotifOnCanvas(
+            ctx,
+            img,
+            item.renderX,
+            item.renderY,
+            item.motif.scale,
+            item.motif.rotation,
+            item.motif.flipH,
+            item.motif.flipV
+          );
+        }
+        continue;
+      }
+
       const motifDef = MOTIF_MAP.get(item.motif.motifId);
       if (!motifDef) continue;
 
@@ -90,6 +109,7 @@ export const TileCanvas: React.FC<TileCanvasProps> = ({
         item.motif.flipV
       );
     }
+
   }, [state]);
 
   useEffect(() => {

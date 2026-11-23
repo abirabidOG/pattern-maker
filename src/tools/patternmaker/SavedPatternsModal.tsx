@@ -1,8 +1,10 @@
 'use client';
 
-import React from 'react';
-import { X, Trash2, FolderOpen, Calendar } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Trash2, FolderOpen, Plus, Tag } from 'lucide-react';
 import type { SavedPatternItem, PatternState } from './types';
+import { getCollections, saveCollectionToStorage } from './storage/localStorage';
+import { trackCollectionCreated } from './analytics';
 
 interface SavedPatternsModalProps {
   isOpen: boolean;
@@ -19,7 +21,28 @@ export const SavedPatternsModal: React.FC<SavedPatternsModalProps> = ({
   onLoadPattern,
   onDeletePattern,
 }) => {
+  const [selectedCollection, setSelectedCollection] = useState<string>('All');
+  const [newCollectionName, setNewCollectionName] = useState<string>('');
+  const [isAddingCollection, setIsAddingCollection] = useState<boolean>(false);
+  const [collectionsList, setCollectionsList] = useState<string[]>(() => getCollections());
+
   if (!isOpen) return null;
+
+  const handleCreateCollection = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCollectionName.trim()) return;
+    const updated = saveCollectionToStorage(newCollectionName.trim());
+    setCollectionsList(updated);
+    setSelectedCollection(newCollectionName.trim());
+    trackCollectionCreated(newCollectionName.trim());
+    setNewCollectionName('');
+    setIsAddingCollection(false);
+  };
+
+  const filteredList =
+    selectedCollection === 'All'
+      ? savedList
+      : savedList.filter((item) => (item.collection || 'Favorites') === selectedCollection);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
@@ -28,10 +51,10 @@ export const SavedPatternsModal: React.FC<SavedPatternsModalProps> = ({
         <div className="flex items-center justify-between border-b border-[#0B0B0D]/10 pb-3">
           <div>
             <h3 className="text-base font-bold text-[#0B0B0D] font-headline">
-              Saved Patterns (In-Browser Storage)
+              Pattern Collections
             </h3>
             <p className="text-[11px] text-[#4F4E55]">
-              Patterns are saved locally on your device in your browser.
+              Organize and load your saved patterns directly from your browser.
             </p>
           </div>
           <button
@@ -44,18 +67,86 @@ export const SavedPatternsModal: React.FC<SavedPatternsModalProps> = ({
           </button>
         </div>
 
+        {/* Collection Filter Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          <button
+            type="button"
+            onClick={() => setSelectedCollection('All')}
+            className={`px-3 py-1 rounded-full text-xs font-semibold shrink-0 transition-all ${
+              selectedCollection === 'All'
+                ? 'bg-[#0B0B0D] text-white'
+                : 'bg-[#F4F2EC] text-[#4F4E55] hover:text-[#0B0B0D]'
+            }`}
+          >
+            All ({savedList.length})
+          </button>
+
+          {collectionsList.map((col) => {
+            const count = savedList.filter((p) => (p.collection || 'Favorites') === col).length;
+            return (
+              <button
+                key={col}
+                type="button"
+                onClick={() => setSelectedCollection(col)}
+                className={`px-3 py-1 rounded-full text-xs font-semibold shrink-0 transition-all ${
+                  selectedCollection === col
+                    ? 'bg-[#5846F6] text-white'
+                    : 'bg-[#F4F2EC] text-[#4F4E55] hover:text-[#0B0B0D]'
+                }`}
+              >
+                {col} {count > 0 ? `(${count})` : ''}
+              </button>
+            );
+          })}
+
+          {!isAddingCollection ? (
+            <button
+              type="button"
+              onClick={() => setIsAddingCollection(true)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-[#5846F6] hover:bg-[#5846F6]/10 shrink-0"
+            >
+              <Plus className="h-3 w-3" />
+              <span>New</span>
+            </button>
+          ) : (
+            <form onSubmit={handleCreateCollection} className="flex items-center gap-1 shrink-0">
+              <input
+                type="text"
+                placeholder="Collection name"
+                value={newCollectionName}
+                onChange={(e) => setNewCollectionName(e.target.value)}
+                autoFocus
+                className="px-2 py-0.5 rounded-lg border border-[#0B0B0D]/20 text-xs w-28 focus:outline-none focus:ring-1 focus:ring-[#5846F6]"
+              />
+              <button
+                type="submit"
+                className="px-2 py-0.5 rounded-lg bg-[#5846F6] text-white text-[11px] font-bold"
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAddingCollection(false)}
+                className="px-1 text-xs text-[#4F4E55]"
+              >
+                ×
+              </button>
+            </form>
+          )}
+        </div>
+
         {/* List of Patterns */}
         <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-          {savedList.length === 0 ? (
+          {filteredList.length === 0 ? (
             <div className="py-12 text-center text-xs text-[#4F4E55] space-y-2">
               <FolderOpen className="h-8 w-8 mx-auto text-[#0B0B0D]/30" />
-              <p>No saved patterns yet.</p>
+              <p>No patterns saved in {selectedCollection === 'All' ? 'any collection' : selectedCollection}.</p>
               <p className="text-[11px] text-[#4F4E55]/80">
                 Click &quot;Save to Browser&quot; on any pattern to keep it handy!
               </p>
             </div>
           ) : (
-            savedList.map((item) => (
+            filteredList.map((item) => (
               <div
                 key={item.id}
                 className="flex items-center justify-between gap-3 p-3 rounded-2xl border border-[#0B0B0D]/10 bg-[#F4F2EC]/30 hover:bg-[#F4F2EC]/80 transition-colors"
@@ -76,9 +167,15 @@ export const SavedPatternsModal: React.FC<SavedPatternsModalProps> = ({
 
                 {/* Details */}
                 <div className="flex-1 min-w-0 space-y-0.5">
-                  <p className="text-xs font-bold text-[#0B0B0D] truncate">
-                    {item.name}
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-bold text-[#0B0B0D] truncate">
+                      {item.name}
+                    </p>
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-black/5 text-[#4F4E55] font-mono text-[9px]">
+                      <Tag className="h-2.5 w-2.5" />
+                      {item.collection || 'Favorites'}
+                    </span>
+                  </div>
                   <p className="text-[10px] text-[#4F4E55] capitalize">
                     {item.state.layout} layout &bull; {item.state.motifs.length} motifs &bull;{' '}
                     {item.state.palette.name}
@@ -117,3 +214,4 @@ export const SavedPatternsModal: React.FC<SavedPatternsModalProps> = ({
     </div>
   );
 };
+

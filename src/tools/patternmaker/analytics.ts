@@ -67,3 +67,51 @@ export function trackPaletteApplied(paletteId: string) {
     palette_id: paletteId,
   });
 }
+
+// Phase 2 GA4 events
+export function trackImageToPatternUploaded(filename: string, sizeBytes: number) {
+  sendEvent('image_to_pattern_uploaded', {
+    filename,
+    size_bytes: sizeBytes,
+    tool: 'pattern-maker',
+  });
+}
+
+export function trackCollectionCreated(collectionName: string) {
+  sendEvent('collection_created', {
+    collection_name: collectionName,
+    tool: 'pattern-maker',
+  });
+}
+
+export function trackPatternSavedToCollection(collectionName: string) {
+  sendEvent('pattern_saved_to_collection', {
+    collection_name: collectionName,
+    tool: 'pattern-maker',
+  });
+}
+
+export function trackPrintSheetDownloaded() {
+  sendEvent('print_sheet_300dpi_downloaded', {
+    dimensions: '2625x3375',
+    dpi: 300,
+    has_bleed: true,
+    safe_margin: '1 inch',
+    tool: 'pattern-maker',
+  });
+}
+
+export function trackStarterGalleryLoaded(presetName: string, category: string) {
+  sendEvent('starter_gallery_loaded', {
+    preset_name: presetName,
+    category,
+    tool: 'pattern-maker',
+  });
+}
+
+export function trackCssBackgroundCopied() {
+  sendEvent('css_background_copied', {
+    tool: 'pattern-maker',
+  });
+}
+

@@ -1,6 +1,6 @@
 import type { PatternState } from '../types';
 import { MOTIF_MAP } from '../motifs/data';
-import { renderMotifToSvg } from '../motifs/renderMotif';
+import { renderMotifToSvg, renderImageMotifToSvg } from '../motifs/renderMotif';
 import { getWrappedMotifs } from '../engine/seamlessWrap';
 
 export function exportTileSvg(
@@ -11,8 +11,22 @@ export function exportTileSvg(
 
   const motifSvgElements = wrapped
     .map((item) => {
+      if (item.motif.imageDataUrl || state.uploadedImageUrl) {
+        const url = item.motif.imageDataUrl || state.uploadedImageUrl!;
+        return renderImageMotifToSvg(
+          url,
+          item.renderX,
+          item.renderY,
+          item.motif.scale,
+          item.motif.rotation,
+          item.motif.flipH,
+          item.motif.flipV
+        );
+      }
+
       const motifDef = MOTIF_MAP.get(item.motif.motifId);
       if (!motifDef) return '';
+
 
       const color =
         item.motif.customColor ||
@@ -54,3 +68,20 @@ export function exportTileSvg(
   const filename = `pattern-seamless-tile.svg`;
   return { svgContent, filename };
 }
+
+/**
+ * Phase 2: Generates a CSS repeating background snippet using the pattern tile
+ */
+export function exportCssBackgroundSnippet(state: PatternState, displayTileSize = 300): string {
+  const { svgContent } = exportTileSvg(state, false);
+  const base64 = typeof btoa !== 'undefined'
+    ? btoa(unescape(encodeURIComponent(svgContent)))
+    : Buffer.from(svgContent).toString('base64');
+
+  return `/* Pattern Maker Repeating Background Snippet */
+background-color: ${state.backgroundColor};
+background-image: url('data:image/svg+xml;base64,${base64}');
+background-repeat: repeat;
+background-size: ${displayTileSize}px ${displayTileSize}px;`;
+}
+

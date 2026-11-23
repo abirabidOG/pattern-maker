@@ -12,13 +12,15 @@ import {
 } from 'lucide-react';
 import type { PatternState } from './types';
 import { exportTilePng } from './export/exportPng';
-import { exportTileSvg } from './export/exportSvg';
-import { exportPatternSheetPng } from './export/exportSheet';
+import { exportTileSvg, exportCssBackgroundSnippet } from './export/exportSvg';
+import { exportPatternSheetPng, exportPrintSheet300Dpi } from './export/exportSheet';
 import { copyPaletteHex, downloadPaletteTxt } from './export/exportPalette';
 import {
   trackPatternDownloadedPng,
   trackPatternDownloadedSvg,
   trackPatternSheetDownloaded,
+  trackPrintSheetDownloaded,
+  trackCssBackgroundCopied,
 } from './analytics';
 
 interface DownloadBarProps {
@@ -34,7 +36,9 @@ export const DownloadBar: React.FC<DownloadBarProps> = ({
 }) => {
   const [pngResolution, setPngResolution] = useState<500 | 1000 | 2000 | 3000>(2000);
   const [transparentBg, setTransparentBg] = useState<boolean>(false);
+  const [includePrintGuides, setIncludePrintGuides] = useState<boolean>(true);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+
 
   // Download helper: triggers browser download from Blob
   const triggerDownload = (blob: Blob, filename: string) => {
@@ -104,6 +108,34 @@ export const DownloadBar: React.FC<DownloadBarProps> = ({
     showToast('Palette TXT file saved.');
   };
 
+  const handleDownloadPrintSheet = async () => {
+    setIsExporting(true);
+    try {
+      const { blob, filename } = await exportPrintSheet300Dpi(state, {
+        includeGuides: includePrintGuides,
+      });
+      triggerDownload(blob, filename);
+      trackPrintSheetDownloaded();
+      showToast('300 DPI Print Sheet saved (8.5×11" with Bleed & Margin Guides).');
+    } catch (err: any) {
+      console.error(err);
+      showToast('Error generating 300 DPI print sheet.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleCopyCssBackground = () => {
+    const css = exportCssBackgroundSnippet(state, 240);
+    navigator.clipboard.writeText(css).then(() => {
+      trackCssBackgroundCopied();
+      showToast('CSS repeating background snippet copied to clipboard!');
+    }).catch(() => {
+      showToast('CSS background snippet generated.');
+    });
+  };
+
+
   if (isStickyMobile) {
     return (
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#0B0B0D]/10 p-3 flex items-center justify-between gap-2 shadow-lg sm:hidden">
@@ -154,7 +186,7 @@ export const DownloadBar: React.FC<DownloadBarProps> = ({
       </div>
 
       {/* Main Download Actions Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* 1. Tile PNG with resolution selector */}
         <div className="rounded-2xl border border-[#0B0B0D]/10 bg-[#F4F2EC]/40 p-4 space-y-3 flex flex-col justify-between">
           <div className="space-y-1">
@@ -239,20 +271,66 @@ export const DownloadBar: React.FC<DownloadBarProps> = ({
             <span>Download Sheet (3000px)</span>
           </button>
         </div>
+
+        {/* 4. Phase 2: 300 DPI Print Sheet with Bleed & 1" Margin Guide */}
+        <div className="rounded-2xl border border-[#5846F6]/30 bg-[#FAF9F5] p-4 space-y-3 flex flex-col justify-between relative overflow-hidden">
+          <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-[#D4FF3A] text-[#0B0B0D] font-mono text-[9px] font-bold uppercase">
+            300 DPI
+          </div>
+          <div className="space-y-1">
+            <span className="font-bold text-xs uppercase tracking-wider text-[#0B0B0D] font-mono block">
+              Print Sheet (Letter)
+            </span>
+            <p className="text-[11px] text-[#4F4E55]">
+              8.5×11" @ 300 DPI with 0.125" bleed &amp; 1" safe margin guide
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="inline-flex items-center gap-1.5 text-[10px] text-[#4F4E55] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includePrintGuides}
+                onChange={(e) => setIncludePrintGuides(e.target.checked)}
+                className="rounded border-[#0B0B0D]/20 text-[#5846F6] h-3 w-3"
+              />
+              <span>Include Crop &amp; Margin Guides</span>
+            </label>
+
+            <button
+              type="button"
+              onClick={handleDownloadPrintSheet}
+              disabled={isExporting}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#5846F6] hover:bg-[#4735E5] text-white py-2.5 text-xs font-bold shadow-xs transition-all hover:-translate-y-0.5 active:translate-y-0"
+            >
+              <Download className="h-4 w-4 text-[#D4FF3A]" />
+              <span>300 DPI Sheet</span>
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Palette Export Row */}
+      {/* Palette & CSS Background Export Row */}
       <div className="pt-2 border-t border-[#0B0B0D]/10 flex flex-wrap items-center justify-between gap-3 text-xs">
         <span className="text-[#4F4E55]">
-          Need the colors for design work?
+          Developer &amp; Design Snippets:
         </span>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Phase 2: Copy CSS Background */}
+          <button
+            type="button"
+            onClick={handleCopyCssBackground}
+            className="inline-flex items-center gap-1.5 rounded-full bg-[#5846F6]/10 hover:bg-[#5846F6]/20 border border-[#5846F6]/30 px-3.5 py-1.5 font-bold text-[#5846F6] transition-colors"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            <span>Copy CSS Background</span>
+          </button>
           <button
             type="button"
             onClick={handleCopyPaletteHex}
             className="inline-flex items-center gap-1.5 rounded-full border border-[#0B0B0D]/15 bg-white hover:bg-[#F4F2EC] px-3.5 py-1.5 font-bold text-[#0B0B0D] transition-colors"
           >
-            <Copy className="h-3.5 w-3.5 text-[#5846F6]" />
+            <Copy className="h-3.5 w-3.5 text-[#4F4E55]" />
             <span>Copy HEX Codes</span>
           </button>
           <button
@@ -265,6 +343,7 @@ export const DownloadBar: React.FC<DownloadBarProps> = ({
           </button>
         </div>
       </div>
+
     </div>
   );
 };

@@ -173,3 +173,65 @@ export function renderMotifToSvg(
 
   return `<g transform="${transform}">${pathElements.join('')}</g>`;
 }
+
+// Phase 2: Client-side Image-to-Pattern helpers
+const imageElementCache = new Map<string, HTMLImageElement>();
+
+export function getCachedImage(url: string, onLoaded?: () => void): HTMLImageElement {
+  let img = imageElementCache.get(url);
+  if (!img) {
+    img = new Image();
+    img.crossOrigin = 'anonymous';
+    if (onLoaded) {
+      img.onload = onLoaded;
+    }
+    img.src = url;
+    imageElementCache.set(url, img);
+  }
+  return img;
+}
+
+export function renderImageMotifOnCanvas(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  scale: number,
+  rotation: number,
+  flipH: boolean,
+  flipV: boolean
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  if (rotation !== 0) {
+    ctx.rotate((rotation * Math.PI) / 180);
+  }
+  const sx = (flipH ? -1 : 1) * (scale / 100);
+  const sy = (flipV ? -1 : 1) * (scale / 100);
+  ctx.scale(sx, sy);
+  const aspect = img.naturalHeight / (img.naturalWidth || 1);
+  const w = 100;
+  const h = 100 * aspect;
+  ctx.drawImage(img, -w / 2, -h / 2, w, h);
+  ctx.restore();
+}
+
+export function renderImageMotifToSvg(
+  imageUrl: string,
+  x: number,
+  y: number,
+  scale: number,
+  rotation: number,
+  flipH: boolean,
+  flipV: boolean
+): string {
+  const sx = (flipH ? -1 : 1) * +(scale / 100).toFixed(4);
+  const sy = (flipV ? -1 : 1) * +(scale / 100).toFixed(4);
+  let transform = `translate(${x.toFixed(2)}, ${y.toFixed(2)})`;
+  if (rotation !== 0) {
+    transform += ` rotate(${rotation.toFixed(2)})`;
+  }
+  transform += ` scale(${sx}, ${sy}) translate(-50, -50)`;
+  return `<g transform="${transform}"><image href="${imageUrl}" width="100" height="100" preserveAspectRatio="xMidYMid meet"/></g>`;
+}
+

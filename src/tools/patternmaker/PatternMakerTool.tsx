@@ -7,6 +7,12 @@ import {
   AlertCircle,
   Command,
   Keyboard,
+  Image as ImageIcon,
+  Upload,
+  ChevronUp,
+  ChevronDown,
+  Layers,
+  Grid,
 } from 'lucide-react';
 import type { PatternState, EditorTool, Palette, PlacedMotif } from './types';
 import { DEFAULT_PALETTE, DEFAULT_BACKGROUND, PALETTES } from './palettes';
@@ -21,13 +27,18 @@ import {
 } from './storage/localStorage';
 import { encodePatternToHash, decodePatternFromHash } from './storage/urlHash';
 import { exportTilePng } from './export/exportPng';
+import { STARTER_GALLERY, type StarterPatternPreset } from './starterGallery';
 import {
   trackPatternGenerated,
   trackPatternVariation,
   trackMotifPlaced,
   trackPatternShared,
   trackPaletteApplied,
+  trackImageToPatternUploaded,
+  trackStarterGalleryLoaded,
+  trackPatternSavedToCollection,
 } from './analytics';
+
 
 import { TileCanvas } from './TileCanvas';
 import { RepeatPreview } from './RepeatPreview';
@@ -81,6 +92,12 @@ export const PatternMakerTool: React.FC = () => {
   const [showOverwriteConfirm, setShowOverwriteConfirm] = useState<boolean>(false);
   const pendingActionRef = useRef<(() => void) | null>(null);
   const variationCounterRef = useRef<number>(1);
+
+  // Phase 2: Starter Gallery & Image to Pattern state
+  const [isGalleryOpen, setIsGalleryOpen] = useState<boolean>(true);
+  const [galleryCategory, setGalleryCategory] = useState<'all' | 'florals' | 'geometrics' | 'kids' | 'festive'>('all');
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
 
   // Update saved count on mount
   useEffect(() => {
@@ -344,7 +361,7 @@ export const PatternMakerTool: React.FC = () => {
     showToast('Motifs recoloured.');
   };
 
-  // Save Pattern to Browser localStorage
+  // Save Pattern to Browser localStorage (Collections support)
   const handleSavePattern = async () => {
     try {
       const { blob } = await exportTilePng(patternState, {
@@ -357,14 +374,64 @@ export const PatternMakerTool: React.FC = () => {
         reader.readAsDataURL(blob);
       });
 
-      const updatedList = savePatternToStorage(patternState, dataUrl);
+      const col = patternState.collection || 'Favorites';
+      const updatedList = savePatternToStorage(patternState, dataUrl, col);
       setSavedCount(updatedList.length);
-      showToast('Pattern saved to browser!');
+      trackPatternSavedToCollection(col);
+      showToast(`Pattern saved to collection "${col}"!`);
     } catch (err) {
       console.error(err);
       showToast('Could not save pattern.');
     }
   };
+
+  // Phase 2: Starter Gallery preset loader
+  const handleLoadStarterPreset = (preset: StarterPatternPreset) => {
+    setPatternState(preset.state);
+    historyRef.current?.push(preset.state);
+    setPromptText(preset.prompt);
+    setParseReadout(`Loaded "${preset.name}" starter preset.`);
+    setUnmatchedNote(null);
+    trackStarterGalleryLoaded(preset.name, preset.category);
+    showToast(`Loaded ${preset.name}!`);
+  };
+
+  // Phase 2: Client-side Image to Pattern
+  const handleImageUpload = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select a valid image file (PNG, JPG, WebP).');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      if (dataUrl) {
+        const cleanName = file.name.replace(/\.[^/.]+$/, '');
+        const newMotifs = generatePatternLayout({
+          layout: patternState.layout === 'free' ? 'half-drop' : patternState.layout,
+          motifIds: ['custom-image'],
+          motifSize: patternState.motifSize || 55,
+          spacing: patternState.spacing || 5,
+          rotation: 0,
+          colorCount: 1,
+        }).map((m) => ({ ...m, imageDataUrl: dataUrl }));
+
+        const nextState: PatternState = {
+          ...patternState,
+          name: `${cleanName} Seamless Pattern`,
+          uploadedImageUrl: dataUrl,
+          motifs: newMotifs,
+        };
+
+        setPatternState(nextState);
+        historyRef.current?.push(nextState);
+        trackImageToPatternUploaded(file.name, file.size);
+        showToast('Image loaded! Repeating pattern generated client-side.');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
 
   // Share Pattern link via URL hash
   const handleSharePattern = async () => {
@@ -440,10 +507,144 @@ export const PatternMakerTool: React.FC = () => {
         </div>
       )}
 
+      {/* Phase 2: Starter Gallery of Built-in Pattern Sets */}
+      <div className="rounded-3xl border border-[#0B0B0D]/10 bg-white p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-[#5846F6]" />
+            <h3 className="text-sm sm:text-base font-bold text-[#0B0B0D] font-headline">
+              Starter Gallery (Built-in 1-Click Sets)
+            </h3>
+            <span className="px-2 py-0.5 rounded-full bg-[#D4FF3A] text-[#0B0B0D] font-mono text-[9px] font-bold uppercase">
+              Phase 2
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            {(['all', 'florals', 'geometrics', 'kids', 'festive'] as const).map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setGalleryCategory(cat)}
+                className={`px-3 py-1 rounded-full text-xs font-semibold capitalize transition-all shrink-0 ${
+                  galleryCategory === cat
+                    ? 'bg-[#5846F6] text-white shadow-xs'
+                    : 'bg-[#F4F2EC] text-[#4F4E55] hover:text-[#0B0B0D]'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Gallery Cards Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {STARTER_GALLERY.filter(
+            (p) => galleryCategory === 'all' || p.category === galleryCategory
+          ).map((preset) => (
+            <div
+              key={preset.id}
+              className="rounded-2xl border border-[#0B0B0D]/10 bg-[#FAF9F5] p-3 flex flex-col justify-between hover:border-[#5846F6]/50 transition-all group"
+            >
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-[#5846F6]">
+                    {preset.category}
+                  </span>
+                  <div
+                    className="h-3 w-3 rounded-full border border-black/10"
+                    style={{ backgroundColor: preset.state.backgroundColor }}
+                  />
+                </div>
+                <h4 className="text-xs font-bold text-[#0B0B0D] group-hover:text-[#5846F6] transition-colors">
+                  {preset.name}
+                </h4>
+                <p className="text-[10px] text-[#4F4E55] line-clamp-2 leading-relaxed">
+                  {preset.description}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleLoadStarterPreset(preset)}
+                className="mt-3 w-full py-1.5 rounded-xl bg-white border border-[#0B0B0D]/10 hover:bg-[#5846F6] hover:text-white hover:border-[#5846F6] text-[#0B0B0D] text-[11px] font-bold transition-all shadow-xs"
+              >
+                Load Preset
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Main Workspace Layout (Desktop Two-Column & Mobile Responsive Flow) */}
       <div className="flex flex-col lg:grid lg:grid-cols-12 gap-8 items-start">
         {/* Left Column: Tile Canvas + Shortcuts on Desktop */}
         <div className="w-full lg:col-span-6 space-y-4 order-1 lg:order-1">
+          {/* Phase 2: Image-to-Pattern Card */}
+          <div className="rounded-3xl border border-[#0B0B0D]/10 bg-white p-4 sm:p-5 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="h-4 w-4 text-[#5846F6]" />
+                <span className="text-xs font-bold text-[#0B0B0D] font-headline uppercase tracking-wider font-mono">
+                  Image-to-Pattern (Client-Side)
+                </span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-[#D4FF3A] text-[#0B0B0D] font-mono text-[9px] font-bold uppercase">
+                Phase 2
+              </span>
+            </div>
+
+            <p className="text-[11px] text-[#4F4E55] leading-relaxed">
+              Upload any photo or icon to seamlessly tile across layouts. 100% in-browser client-side repeat — no upload to any server, without claiming background removal.
+            </p>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                className="inline-flex items-center gap-2 rounded-xl bg-[#5846F6] hover:bg-[#4735E5] text-white px-3.5 py-2 text-xs font-bold shadow-xs transition-all"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                <span>Upload Photo / Icon</span>
+              </button>
+
+              {patternState.uploadedImageUrl && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const fallbackMotifs = generatePatternLayout({
+                      layout: 'half-drop',
+                      motifIds: ['flower', 'leaf'],
+                      motifSize: 55,
+                      spacing: 5,
+                      rotation: 25,
+                      colorCount: 3,
+                    });
+                    updateState({ uploadedImageUrl: undefined, motifs: fallbackMotifs });
+                    showToast('Cleared custom image.');
+                  }}
+                  className="rounded-xl border border-[#0B0B0D]/10 bg-[#F4F2EC] hover:bg-[#E5E1D6] px-3 py-2 text-xs font-medium text-[#4F4E55] hover:text-[#0B0B0D] transition-colors"
+                >
+                  Clear Image
+                </button>
+              )}
+            </div>
+
+            {/* Hidden Image Input */}
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/svg+xml"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImageUpload(file);
+                e.target.value = '';
+              }}
+              className="hidden"
+            />
+          </div>
+
           <div className="flex items-center justify-between pb-1">
             <h2 className="text-base sm:text-lg font-bold text-[#0B0B0D] font-headline flex items-center gap-2">
               <span>Tile Canvas (600&times;600)</span>
@@ -452,6 +653,7 @@ export const PatternMakerTool: React.FC = () => {
               Seamless boundary wrap active
             </span>
           </div>
+
 
           {/* Interactive Tile Canvas */}
           <TileCanvas
