@@ -515,9 +515,6 @@ export const PatternMakerTool: React.FC = () => {
             <h3 className="text-sm sm:text-base font-bold text-[#0B0B0D] font-headline">
               Starter Gallery (Built-in 1-Click Sets)
             </h3>
-            <span className="px-2 py-0.5 rounded-full bg-[#D4FF3A] text-[#0B0B0D] font-mono text-[9px] font-bold uppercase">
-              Phase 2
-            </span>
           </div>
 
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
@@ -590,9 +587,6 @@ export const PatternMakerTool: React.FC = () => {
                   Image-to-Pattern (Client-Side)
                 </span>
               </div>
-              <span className="px-2 py-0.5 rounded-full bg-[#D4FF3A] text-[#0B0B0D] font-mono text-[9px] font-bold uppercase">
-                Phase 2
-              </span>
             </div>
 
             <p className="text-[11px] text-[#4F4E55] leading-relaxed">
